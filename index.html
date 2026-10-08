@@ -1,0 +1,2148 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-950 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduCalendar - Organizador Escolar & Base de Datos Local</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f5ff',
+                            100: '#e0ebff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #090d16; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #334155; }
+        
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glass-card {
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+        }
+
+        .schedule-grid {
+            display: grid;
+            grid-template-columns: 60px repeat(5, minmax(110px, 1fr));
+        }
+
+        @media (max-width: 640px) {
+            .schedule-grid {
+                grid-template-columns: 50px repeat(5, minmax(90px, 1fr));
+            }
+        }
+
+        .badge-pulse {
+            animation: pulse-border 2s infinite;
+        }
+        
+        @keyframes pulse-border {
+            0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+            70% { box-shadow: 0 0 0 8px rgba(99, 102, 241, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col bg-slate-950 text-slate-100 overflow-x-hidden antialiased selection:bg-indigo-500 selection:text-white">
+
+    <header id="mainHeader" class="hidden glass-panel sticky top-0 z-30 border-b border-slate-800/80 px-4 py-3 sm:px-6">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div class="flex items-center justify-between w-full sm:w-auto">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
+                        <i class="fa-solid fa-graduation-cap text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg leading-tight tracking-tight text-white flex items-center gap-2">
+                            EduCalendar
+                            <span class="text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                <i class="fa-solid fa-database text-[9px] mr-1"></i>DB Local
+                            </span>
+                        </h1>
+                        <p class="text-xs text-slate-400">Organizador Escolar & Base de Datos IndexedDB</p>
+                    </div>
+                </div>
+
+                <!-- User Mobile Controls -->
+                <div class="flex sm:hidden items-center gap-2">
+                    <button onclick="openBackupModal()" title="Respaldos DB" class="text-slate-400 hover:text-indigo-400 p-2">
+                        <i class="fa-solid fa-hard-drive"></i>
+                    </button>
+                    <button onclick="logoutUser()" title="Cerrar Sesión" class="text-slate-400 hover:text-rose-400 p-2">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Main View Navigation Tabs -->
+            <div class="flex bg-slate-900/90 p-1 rounded-2xl border border-slate-800 text-xs font-semibold w-full sm:w-auto justify-center overflow-x-auto">
+                <button onclick="switchMainTab('calendar')" id="navTabCalendar" class="px-3 py-1.5 rounded-xl text-indigo-300 bg-slate-800 shadow transition flex items-center gap-1.5 whitespace-nowrap">
+                    <i class="fa-solid fa-calendar-days"></i>
+                    <span>Calendario</span>
+                </button>
+                <button onclick="switchMainTab('schedule')" id="navTabSchedule" class="px-3 py-1.5 rounded-xl text-slate-400 hover:text-slate-200 transition flex items-center gap-1.5 whitespace-nowrap">
+                    <i class="fa-solid fa-clock"></i>
+                    <span>Horario</span>
+                </button>
+                <button onclick="switchMainTab('tasks')" id="navTabTasks" class="px-3 py-1.5 rounded-xl text-slate-400 hover:text-slate-200 transition flex items-center gap-1.5 whitespace-nowrap">
+                    <i class="fa-solid fa-list-check"></i>
+                    <span>Tareas</span>
+                </button>
+                <button onclick="switchMainTab('groups')" id="navTabGroups" class="px-3 py-1.5 rounded-xl text-slate-400 hover:text-slate-200 transition flex items-center gap-1.5 whitespace-nowrap">
+                    <i class="fa-solid fa-users"></i>
+                    <span>Grupos</span>
+                </button>
+                <button onclick="switchMainTab('analytics')" id="navTabAnalytics" class="px-3 py-1.5 rounded-xl text-slate-400 hover:text-slate-200 transition flex items-center gap-1.5 whitespace-nowrap">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    <span>Estadísticas</span>
+                </button>
+            </div>
+
+            <!-- User Info & Action buttons -->
+            <div class="hidden sm:flex items-center gap-3">
+                <button onclick="openNewTaskModal()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-2 rounded-xl font-medium text-xs transition shadow-lg shadow-indigo-600/25 active:scale-95">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Nueva Tarea</span>
+                </button>
+                <button onclick="openBackupModal()" title="Copia de Seguridad de DB Local" class="p-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 hover:text-indigo-400 transition text-xs">
+                    <i class="fa-solid fa-database"></i>
+                </button>
+                <div class="h-6 w-px bg-slate-800"></div>
+                <div class="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800">
+                    <div class="w-7 h-7 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs uppercase" id="userAvatar">
+                        U
+                    </div>
+                    <span class="text-xs font-semibold text-slate-200 max-w-[100px] truncate" id="userDisplayName">Usuario</span>
+                    <button onclick="logoutUser()" title="Cerrar Sesión" class="text-slate-400 hover:text-rose-400 ml-1 transition">
+                        <i class="fa-solid fa-right-from-bracket text-xs"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div id="authScreen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950 p-4">
+        <div class="absolute inset-0 overflow-hidden pointer-events-none">
+            <div class="absolute -top-40 -left-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl"></div>
+            <div class="absolute -bottom-40 -right-40 w-96 h-96 bg-violet-600/20 rounded-full blur-3xl"></div>
+        </div>
+
+        <div class="relative w-full max-w-md glass-panel p-8 rounded-3xl shadow-2xl border border-slate-800/80">
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 mx-auto flex items-center justify-center text-white text-2xl shadow-xl shadow-indigo-500/30 mb-4">
+                    <i class="fa-solid fa-book-bookmark"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-white tracking-tight" id="authTitle">Acceso a EduCalendar</h2>
+                <p class="text-xs text-slate-400 mt-1.5" id="authSubtitle">Inicia sesión local o crea una cuenta en tu navegador</p>
+                
+                <div class="mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[11px] text-indigo-300 font-medium">
+                    <i class="fa-solid fa-shield-halved text-emerald-400"></i>
+                    <span>Base de datos local guardada offline</span>
+                </div>
+            </div>
+
+            <!-- Login / Register Form -->
+            <form id="authForm" onsubmit="handleAuthSubmit(event)" class="space-y-4">
+                <div id="displayNameContainer" class="hidden">
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Nombre Completo o Estudiante</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-user absolute left-3.5 top-3.5 text-slate-500 text-xs"></i>
+                        <input type="text" id="authDisplayNameInput" placeholder="Ej. Alex Rodríguez" class="w-full bg-slate-900 border border-slate-700/80 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Nombre de Usuario</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-at absolute left-3.5 top-3.5 text-slate-500 text-xs"></i>
+                        <input type="text" id="authUsernameInput" required placeholder="tu_usuario" class="w-full bg-slate-900 border border-slate-700/80 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Contraseña de Acceso</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-lock absolute left-3.5 top-3.5 text-slate-500 text-xs"></i>
+                        <input type="password" id="authPasswordInput" required placeholder="••••••••" class="w-full bg-slate-900 border border-slate-700/80 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
+                    </div>
+                </div>
+
+                <div id="authError" class="hidden p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
+                    <i class="fa-solid fa-circle-exclamation text-sm flex-shrink-0"></i>
+                    <span id="authErrorMsg">Error de credenciales</span>
+                </div>
+
+                <button type="submit" id="authSubmitBtn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-xl font-semibold text-xs transition shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 active:scale-98">
+                    <span>Iniciar Sesión</span>
+                    <i class="fa-solid fa-arrow-right text-xs"></i>
+                </button>
+            </form>
+
+            <div class="mt-6 text-center border-t border-slate-800/80 pt-4">
+                <p class="text-xs text-slate-400" id="authToggleText">
+                    ¿Aún no tienes cuenta registrada en el dispositivo? 
+                    <button onclick="toggleAuthMode()" class="text-indigo-400 font-semibold hover:underline ml-1" id="authToggleBtn">Crear cuenta en la Base de Datos</button>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP CONTENT -->
+    <main id="appContent" class="hidden flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
+
+        <!-- Left 3 Columns: Main View Switcher Content -->
+        <section class="lg:col-span-3 space-y-5">
+            
+            <!-- SECTION 1: CALENDAR VIEW -->
+            <div id="sectionCalendar" class="space-y-4">
+                <div class="glass-panel p-4 rounded-2xl flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <button onclick="changeMonth(-1)" class="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 flex items-center justify-center text-slate-300 transition">
+                            <i class="fa-solid fa-chevron-left text-xs"></i>
+                        </button>
+                        <h2 id="calendarMonthYear" class="text-base font-bold text-slate-100 min-w-[140px] text-center capitalize">
+                            Enero 2026
+                        </h2>
+                        <button onclick="changeMonth(1)" class="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 flex items-center justify-center text-slate-300 transition">
+                            <i class="fa-solid fa-chevron-right text-xs"></i>
+                        </button>
+                        <button onclick="goToToday()" class="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-xs font-semibold text-indigo-300 transition border border-indigo-500/20">
+                            Hoy
+                        </button>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                        <select id="subjectFilter" onchange="applyFilters()" class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                            <option value="ALL">Todas las Materias</option>
+                        </select>
+
+                        <button onclick="openNewTaskModal()" class="sm:hidden w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center ml-auto">
+                            <i class="fa-solid fa-plus text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="glass-panel rounded-2xl p-4 overflow-hidden">
+                    <div class="calendar-grid mb-2 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                        <div class="py-2 text-rose-400">Dom</div>
+                        <div class="py-2">Lun</div>
+                        <div class="py-2">Mar</div>
+                        <div class="py-2">Mié</div>
+                        <div class="py-2">Jue</div>
+                        <div class="py-2">Vie</div>
+                        <div class="py-2 text-indigo-400">Sáb</div>
+                    </div>
+
+                    <div id="calendarGrid" class="calendar-grid gap-1.5 sm:gap-2">
+                        <!-- Dynamic Month Days -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 2: CLASS SCHEDULE VIEW -->
+            <div id="sectionSchedule" class="hidden space-y-4">
+                <div class="glass-panel p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h3 class="font-bold text-base text-white flex items-center gap-2">
+                            <i class="fa-solid fa-calendar-week text-indigo-400"></i>
+                            <span>Horario de Clases Semanal</span>
+                        </h3>
+                        <p class="text-xs text-slate-400">Organiza tus asignaturas fijas de Lunes a Viernes</p>
+                    </div>
+                    <button onclick="openClassScheduleModal()" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition flex items-center gap-2 shadow-md shadow-indigo-600/20">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>Añadir Clase al Horario</span>
+                    </button>
+                </div>
+
+                <div class="glass-panel rounded-2xl p-4 overflow-x-auto">
+                    <div class="min-w-[650px]">
+                        <!-- Schedule Header Days -->
+                        <div class="schedule-grid border-b border-slate-800 pb-2 mb-2 text-xs font-bold text-slate-300 text-center">
+                            <div class="text-slate-500">Hora</div>
+                            <div>Lunes</div>
+                            <div>Martes</div>
+                            <div>Miércoles</div>
+                            <div>Jueves</div>
+                            <div>Viernes</div>
+                        </div>
+
+                        <!-- Schedule Time Blocks -->
+                        <div id="scheduleGridBody" class="space-y-1">
+                            <!-- Dynamic Schedule Rows -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 3: TASK LIST VIEW -->
+            <div id="sectionTasks" class="hidden space-y-3">
+                <div class="glass-panel p-4 rounded-2xl flex items-center justify-between gap-3">
+                    <h3 class="text-sm font-bold text-slate-200 flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-indigo-400"></i>
+                        <span>Lista Completa de Tareas y Exámenes</span>
+                    </h3>
+                    <select id="statusFilter" onchange="applyFilters()" class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-indigo-500">
+                        <option value="ALL">Todos los Estados</option>
+                        <option value="PENDING">Pendientes</option>
+                        <option value="COMPLETED">Completadas</option>
+                    </select>
+                </div>
+
+                <div id="taskList" class="space-y-2.5">
+                    <!-- Dynamic Task List Cards -->
+                </div>
+            </div>
+
+            <!-- SECTION 4: GROUPS VIEW -->
+            <div id="sectionGroups" class="hidden space-y-4">
+                <div class="glass-panel p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h3 class="font-bold text-base text-white flex items-center gap-2">
+                            <i class="fa-solid fa-users text-indigo-400"></i>
+                            <span>Grupos de Estudio y Trabajo</span>
+                        </h3>
+                        <p class="text-xs text-slate-400">Crea o únete a grupos para compartir entregas y colaborar localmente</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="openJoinGroupModal()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-indigo-300 text-xs font-semibold transition flex items-center gap-2 border border-indigo-500/20">
+                            <i class="fa-solid fa-key"></i>
+                            <span>Unirme con Código</span>
+                        </button>
+                        <button onclick="openCreateGroupModal()" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition flex items-center gap-2 shadow-md shadow-indigo-600/20">
+                            <i class="fa-solid fa-plus"></i>
+                            <span>Crear Grupo</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- Sidebar: Group List -->
+                    <div class="glass-panel p-4 rounded-2xl space-y-3 md:col-span-1">
+                        <h4 class="font-bold text-xs uppercase tracking-wider text-slate-300 flex items-center justify-between">
+                            <span>Mis Grupos</span>
+                            <span id="groupCountBadge" class="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-500/30">0</span>
+                        </h4>
+                        <div id="myGroupsList" class="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                            <!-- Dynamic group cards -->
+                        </div>
+                    </div>
+
+                    <!-- Main: Selected Group Panel -->
+                    <div id="groupDetailsPanel" class="glass-panel p-5 rounded-2xl md:col-span-2 space-y-4 min-h-[300px]">
+                        <div class="text-center py-12 text-slate-500 space-y-2">
+                            <i class="fa-solid fa-people-group text-4xl text-slate-600"></i>
+                            <p class="text-xs">Selecciona un grupo de la lista para ver sus tareas e integrantes, o crea uno nuevo.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 5: ANALYTICS VIEW -->
+            <div id="sectionAnalytics" class="hidden space-y-4">
+                <div class="glass-panel p-4 rounded-2xl">
+                    <h3 class="font-bold text-base text-white flex items-center gap-2">
+                        <i class="fa-solid fa-chart-line text-indigo-400"></i>
+                        <span>Lienzo de Rendimiento Académico</span>
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-0.5">Visualización en canvas de tus avances, tareas y distribución por materia</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Canvas Chart 1: Donut Completion -->
+                    <div class="glass-panel p-5 rounded-2xl flex flex-col items-center justify-center text-center">
+                        <h4 class="font-bold text-xs text-slate-300 mb-3 uppercase tracking-wider">Estado de Tareas Totales</h4>
+                        <div class="relative w-48 h-48 flex items-center justify-center">
+                            <canvas id="canvasDonutChart" width="192" height="192"></canvas>
+                        </div>
+                        <div class="flex items-center gap-4 text-xs font-semibold mt-4">
+                            <span class="flex items-center gap-1.5 text-emerald-400"><i class="fa-solid fa-circle text-[8px]"></i> Completadas</span>
+                            <span class="flex items-center gap-1.5 text-indigo-400"><i class="fa-solid fa-circle text-[8px]"></i> Pendientes</span>
+                        </div>
+                    </div>
+
+                    <!-- Canvas Chart 2: Subject Distribution Bar Chart -->
+                    <div class="glass-panel p-5 rounded-2xl flex flex-col items-center justify-center text-center">
+                        <h4 class="font-bold text-xs text-slate-300 mb-3 uppercase tracking-wider">Carga Académica por Materia</h4>
+                        <div class="w-full h-48 flex items-center justify-center">
+                            <canvas id="canvasBarChart" width="300" height="190" class="w-full h-full"></canvas>
+                        </div>
+                        <p class="text-[11px] text-slate-400 mt-2">Distribución de entregas pendientes por asignatura</p>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Right Column Sidebar Widgets -->
+        <aside class="space-y-5">
+            
+            <!-- Widget: Recordatorios Próximos -->
+            <div class="glass-panel p-5 rounded-2xl relative overflow-hidden">
+                <div class="flex items-center justify-between mb-3.5">
+                    <h3 class="font-bold text-xs uppercase tracking-wider text-slate-200 flex items-center gap-2">
+                        <i class="fa-solid fa-bell text-indigo-400"></i>
+                        <span>Entregas Próximas</span>
+                    </h3>
+                    <span id="todayBadgeCount" class="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-bold border border-indigo-500/30">0</span>
+                </div>
+
+                <div id="todayRemindersList" class="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+                    <!-- Dynamic Reminders -->
+                </div>
+            </div>
+
+            <!-- Widget: Materias & Colores -->
+            <div class="glass-panel p-5 rounded-2xl">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="font-bold text-xs uppercase tracking-wider text-slate-200 flex items-center gap-2">
+                        <i class="fa-solid fa-palette text-violet-400"></i>
+                        <span>Mis Materias</span>
+                    </h3>
+                    <button onclick="openSubjectModal()" class="text-xs text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1">
+                        <i class="fa-solid fa-plus text-[10px]"></i> Nueva
+                    </button>
+                </div>
+
+                <div id="subjectsList" class="space-y-2 max-h-52 overflow-y-auto pr-1">
+                    <!-- Dynamic Subjects -->
+                </div>
+            </div>
+
+            <!-- Widget: Resumen de Progreso -->
+            <div class="glass-panel p-5 rounded-2xl">
+                <h3 class="font-bold text-xs uppercase tracking-wider text-slate-200 mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-pie text-emerald-400"></i>
+                    <span>Resumen Rápido</span>
+                </h3>
+                
+                <div class="space-y-3">
+                    <div>
+                        <div class="flex justify-between text-xs font-semibold mb-1.5">
+                            <span class="text-slate-400">Progreso Total</span>
+                            <span id="completionPercentage" class="text-emerald-400 font-bold">0%</span>
+                        </div>
+                        <div class="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800">
+                            <div id="progressBar" class="bg-gradient-to-r from-indigo-500 to-emerald-400 h-full w-0 transition-all duration-500"></div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 text-center pt-1">
+                        <div class="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
+                            <div class="text-base font-bold text-indigo-400" id="pendingTasksCount">0</div>
+                            <div class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Pendientes</div>
+                        </div>
+                        <div class="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
+                            <div class="text-base font-bold text-emerald-400" id="completedTasksCount">0</div>
+                            <div class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Listas</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </aside>
+
+    </main>
+
+    <!-- MODAL: Nueva / Editar Tarea -->
+    <div id="taskModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md hidden p-4">
+        <div class="glass-panel w-full max-w-lg p-6 rounded-3xl shadow-2xl border border-slate-800 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-5 pb-3 border-b border-slate-800">
+                <h3 id="taskModalTitle" class="font-bold text-base text-white flex items-center gap-2">
+                    <i class="fa-solid fa-circle-plus text-indigo-400"></i>
+                    <span>Agregar Nueva Tarea</span>
+                </h3>
+                <button onclick="closeTaskModal()" class="text-slate-400 hover:text-white transition">
+                    <i class="fa-solid fa-xmark text-base"></i>
+                </button>
+            </div>
+
+            <form id="taskForm" onsubmit="handleSaveTask(event)" class="space-y-4">
+                <input type="hidden" id="taskIdInput">
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Título de la Tarea / Examen *</label>
+                    <input type="text" id="taskTitleInput" required placeholder="Ej. Ensayo de Historia, Examen de Cálculo..." class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Materia / Asignatura *</label>
+                        <select id="taskSubjectInput" required class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                            <!-- Dynamic Subject options -->
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Tipo de Actividad</label>
+                        <select id="taskTypeInput" class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                            <option value="Tarea">Tarea Escolar</option>
+                            <option value="Examen">Examen / Parcial</option>
+                            <option value="Trabajo Práctico">Trabajo Práctico</option>
+                            <option value="Proyecto">Proyecto Final</option>
+                            <option value="Recordatorio">Recordatorio General</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Fecha de Entrega *</label>
+                        <input type="date" id="taskDateInput" required class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Hora Límite</label>
+                        <input type="time" id="taskTimeInput" value="23:59" class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Prioridad</label>
+                        <select id="taskPriorityInput" class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                            <option value="Baja">Baja</option>
+                            <option value="Media" selected>Media</option>
+                            <option value="Alta">Alta (Urgente)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Recordatorio Sonoro</label>
+                        <select id="taskSoundAlertInput" class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                            <option value="true">Sí (Sonido de alerta)</option>
+                            <option value="false">No</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Notas Adicionales</label>
+                    <textarea id="taskNotesInput" rows="3" placeholder="Páginas del libro, enlace del documento, aula..." class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 resize-none"></textarea>
+                </div>
+
+                <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                    <button type="button" onclick="closeTaskModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition shadow-lg shadow-indigo-600/30 flex items-center gap-2">
+                        <i class="fa-solid fa-floppy-disk text-xs"></i>
+                        <span>Guardar en Base de Datos</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Clase para Horario Semanal -->
+    <div id="classScheduleModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md hidden p-4">
+        <div class="glass-panel w-full max-w-md p-6 rounded-3xl shadow-2xl border border-slate-800">
+            <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-800">
+                <h3 class="font-bold text-base text-white flex items-center gap-2">
+                    <i class="fa-solid fa-clock text-indigo-400"></i>
+                    <span>Añadir Clase al Horario</span>
+                </h3>
+                <button onclick="closeClassScheduleModal()" class="text-slate-400 hover:text-white transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form onsubmit="handleSaveScheduleClass(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Materia *</label>
+                    <select id="scheduleSubjectInput" required class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                        <!-- Dynamic Subjects -->
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Día de la Semana *</label>
+                    <select id="scheduleDayInput" required class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                        <option value="1">Lunes</option>
+                        <option value="2">Martes</option>
+                        <option value="3">Miércoles</option>
+                        <option value="4">Jueves</option>
+                        <option value="5">Viernes</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Hora Inicio</label>
+                        <input type="time" id="scheduleStartTimeInput" value="08:00" required class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Hora Fin</label>
+                        <input type="time" id="scheduleEndTimeInput" value="09:30" required class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Aula / Salón o Enlace Online</label>
+                    <input type="text" id="scheduleRoomInput" placeholder="Ej. Aula 204 / Meet" class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
+                    <button type="button" onclick="closeClassScheduleModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition">
+                        Guardar Horario
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Nueva Materia -->
+    <div id="subjectModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md hidden p-4">
+        <div class="glass-panel w-full max-w-md p-6 rounded-3xl shadow-2xl border border-slate-800">
+            <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-800">
+                <h3 class="font-bold text-base text-white flex items-center gap-2">
+                    <i class="fa-solid fa-folder-plus text-violet-400"></i>
+                    <span>Añadir Nueva Materia</span>
+                </h3>
+                <button onclick="closeSubjectModal()" class="text-slate-400 hover:text-white transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form onsubmit="handleSaveSubject(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Nombre de la Asignatura *</label>
+                    <input type="text" id="subjectNameInput" required placeholder="Ej. Química Orgánica, Programación..." class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Color Identificador</label>
+                    <div class="flex items-center gap-3">
+                        <input type="color" id="subjectColorInput" value="#6366f1" class="w-10 h-10 rounded-xl cursor-pointer bg-transparent border-0">
+                        <span class="text-xs text-slate-400">Selecciona el color para representar esta asignatura en el calendario</span>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
+                    <button type="button" onclick="closeSubjectModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition">
+                        Guardar Materia
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Crear Grupo -->
+    <div id="createGroupModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md hidden p-4">
+        <div class="glass-panel w-full max-w-md p-6 rounded-3xl shadow-2xl border border-slate-800">
+            <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-800">
+                <h3 class="font-bold text-base text-white flex items-center gap-2">
+                    <i class="fa-solid fa-users-gear text-indigo-400"></i>
+                    <span>Crear Nuevo Grupo de Estudio</span>
+                </h3>
+                <button onclick="closeCreateGroupModal()" class="text-slate-400 hover:text-white transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form onsubmit="handleCreateGroup(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Nombre del Grupo / Proyecto *</label>
+                    <input type="text" id="groupNameInput" required placeholder="Ej. Equipo Álgebra Lineal, Proyecto Robótica..." class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Materia u Asignatura</label>
+                    <input type="text" id="groupSubjectInput" placeholder="Ej. Matemáticas, Física, Programación..." class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Descripción / Objetivo</label>
+                    <textarea id="groupDescInput" rows="2" placeholder="Ej. Grupo de trabajo para entregar el proyecto final..." class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 resize-none"></textarea>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
+                    <button type="button" onclick="closeCreateGroupModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition shadow-lg shadow-indigo-600/30 flex items-center gap-2">
+                        <i class="fa-solid fa-check text-xs"></i>
+                        <span>Crear Grupo y Generar Código</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Unirse a Grupo -->
+    <div id="joinGroupModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md hidden p-4">
+        <div class="glass-panel w-full max-w-sm p-6 rounded-3xl shadow-2xl border border-slate-800">
+            <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-800">
+                <h3 class="font-bold text-base text-white flex items-center gap-2">
+                    <i class="fa-solid fa-right-to-bracket text-indigo-400"></i>
+                    <span>Unirme a un Grupo</span>
+                </h3>
+                <button onclick="closeJoinGroupModal()" class="text-slate-400 hover:text-white transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form onsubmit="handleJoinGroup(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Código de Invitación del Grupo *</label>
+                    <input type="text" id="joinGroupCodeInput" required placeholder="Ej. GR-X892A" class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 uppercase tracking-widest font-mono text-center focus:outline-none focus:border-indigo-500">
+                    <p class="text-[10px] text-slate-400 mt-1 text-center">Pídele el código de 7 caracteres al creador del grupo.</p>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
+                    <button type="button" onclick="closeJoinGroupModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition">
+                        Unirse al Grupo
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Crear Tarea de Grupo -->
+    <div id="groupTaskModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md hidden p-4">
+        <div class="glass-panel w-full max-w-md p-6 rounded-3xl shadow-2xl border border-slate-800">
+            <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-800">
+                <h3 class="font-bold text-base text-white flex items-center gap-2">
+                    <i class="fa-solid fa-list-check text-indigo-400"></i>
+                    <span>Añadir Tarea al Grupo</span>
+                </h3>
+                <button onclick="closeGroupTaskModal()" class="text-slate-400 hover:text-white transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form onsubmit="handleSaveGroupTask(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Título de la Tarea / Asignación *</label>
+                    <input type="text" id="groupTaskTitleInput" required placeholder="Ej. Redactar marco teórico, Presentación PPT..." class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Fecha Entrega *</label>
+                        <input type="date" id="groupTaskDateInput" required class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Asignar A</label>
+                        <select id="groupTaskAssigneeInput" class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                            <option value="TODOS">Todos los integrantes</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Notas o Enlace de Entrega</label>
+                    <textarea id="groupTaskNotesInput" rows="2" placeholder="Ej. Documento compartido en Google Drive..." class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 resize-none"></textarea>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
+                    <button type="button" onclick="closeGroupTaskModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition">
+                        Guardar Tarea
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Detalle de Día del Calendario -->
+    <div id="dayDetailModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md hidden p-4">
+        <div class="glass-panel w-full max-w-md p-6 rounded-3xl shadow-2xl border border-slate-800">
+            <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-800">
+                <h3 class="font-bold text-base text-white flex items-center gap-2">
+                    <i class="fa-solid fa-calendar-day text-indigo-400"></i>
+                    <span id="dayModalDateTitle">Entregas del Día</span>
+                </h3>
+                <button onclick="closeDayDetailModal()" class="text-slate-400 hover:text-white transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div id="dayModalTaskList" class="space-y-2 max-h-72 overflow-y-auto pr-1">
+                <!-- Day tasks dynamic render -->
+            </div>
+
+            <div class="flex items-center justify-between pt-4 border-t border-slate-800 mt-4">
+                <button onclick="closeDayDetailModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300">
+                    Cerrar
+                </button>
+                <button onclick="openNewTaskForSelectedDay()" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-plus text-xs"></i>
+                    <span>Agregar Tarea este día</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Gestor & Copias de Respaldos DB -->
+    <div id="backupModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md hidden p-4">
+        <div class="glass-panel w-full max-w-md p-6 rounded-3xl shadow-2xl border border-slate-800">
+            <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-800">
+                <h3 class="font-bold text-base text-white flex items-center gap-2">
+                    <i class="fa-solid fa-hard-drive text-indigo-400"></i>
+                    <span>Gestión de Base de Datos Local</span>
+                </h3>
+                <button onclick="closeBackupModal()" class="text-slate-400 hover:text-white transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <p class="text-xs text-slate-300 leading-relaxed">
+                    Tus datos se guardan directamente en el almacenamiento persistente de tu navegador (**IndexedDB**). Puedes exportar una copia en JSON o restaurar una previa.
+                </p>
+
+                <div class="p-3 bg-slate-900/90 rounded-2xl border border-slate-800 flex items-center justify-between">
+                    <div>
+                        <div class="text-xs font-semibold text-slate-200">Exportar Copia de Seguridad</div>
+                        <div class="text-[10px] text-slate-400">Descarga un archivo .json con tus tareas y horario</div>
+                    </div>
+                    <button onclick="exportDatabaseJSON()" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-download"></i>
+                        <span>Exportar</span>
+                    </button>
+                </div>
+
+                <div class="p-3 bg-slate-900/90 rounded-2xl border border-slate-800 flex items-center justify-between">
+                    <div>
+                        <div class="text-xs font-semibold text-slate-200">Restaurar de Archivo JSON</div>
+                        <div class="text-[10px] text-slate-400">Carga un respaldo previo exportado</div>
+                    </div>
+                    <label class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-indigo-500/20 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5">
+                        <i class="fa-solid fa-upload"></i>
+                        <span>Importar</span>
+                        <input type="file" id="importJsonInput" accept=".json" onchange="importDatabaseJSON(event)" class="hidden">
+                    </label>
+                </div>
+            </div>
+
+            <div class="flex justify-end pt-4 border-t border-slate-800 mt-4">
+                <button onclick="closeBackupModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast System -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 space-y-2 pointer-events-none"></div>
+
+    <script>
+        // ==========================================
+        // LOCAL DATABASE ENGINE (IndexedDB)
+        // ==========================================
+        const DB_NAME = 'EduCalendarLocalDB';
+        const DB_VERSION = 1;
+        let dbInstance = null;
+
+        function initLocalDatabase() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains('users')) {
+                        db.createObjectStore('users', { keyPath: 'username' });
+                    }
+                    if (!db.objectStoreNames.contains('tasks')) {
+                        db.createObjectStore('tasks', { keyPath: 'id' });
+                    }
+                    if (!db.objectStoreNames.contains('subjects')) {
+                        db.createObjectStore('subjects', { keyPath: 'id' });
+                    }
+                    if (!db.objectStoreNames.contains('schedule')) {
+                        db.createObjectStore('schedule', { keyPath: 'id' });
+                    }
+                    if (!db.objectStoreNames.contains('groups')) {
+                        db.createObjectStore('groups', { keyPath: 'id' });
+                    }
+                    if (!db.objectStoreNames.contains('groupTasks')) {
+                        db.createObjectStore('groupTasks', { keyPath: 'id' });
+                    }
+                };
+
+                request.onsuccess = (e) => {
+                    dbInstance = e.target.result;
+                    resolve(dbInstance);
+                };
+
+                request.onerror = (e) => {
+                    console.warn("IndexedDB error, habilitando reserva LocalStorage:", e);
+                    resolve(null);
+                };
+            });
+        }
+
+        // Generic IndexedDB CRUD Helpers with LocalStorage fallback
+        async function dbGetAll(storeName) {
+            if (dbInstance) {
+                return new Promise((resolve) => {
+                    const tx = dbInstance.transaction(storeName, 'readonly');
+                    const store = tx.objectStore(storeName);
+                    const req = store.getAll();
+                    req.onsuccess = () => resolve(req.result || []);
+                    req.onerror = () => resolve(fallbackGetLocal(storeName));
+                });
+            }
+            return fallbackGetLocal(storeName);
+        }
+
+        async function dbPut(storeName, item) {
+            if (dbInstance) {
+                return new Promise((resolve) => {
+                    const tx = dbInstance.transaction(storeName, 'readwrite');
+                    const store = tx.objectStore(storeName);
+                    const req = store.put(item);
+                    req.onsuccess = () => {
+                        fallbackSetLocal(storeName, item);
+                        resolve(item);
+                    };
+                    req.onerror = () => {
+                        fallbackSetLocal(storeName, item);
+                        resolve(item);
+                    };
+                });
+            }
+            fallbackSetLocal(storeName, item);
+            return item;
+        }
+
+        async function dbDelete(storeName, id) {
+            if (dbInstance) {
+                return new Promise((resolve) => {
+                    const tx = dbInstance.transaction(storeName, 'readwrite');
+                    const store = tx.objectStore(storeName);
+                    const req = store.delete(id);
+                    req.onsuccess = () => {
+                        fallbackRemoveLocal(storeName, id);
+                        resolve(true);
+                    };
+                    req.onerror = () => {
+                        fallbackRemoveLocal(storeName, id);
+                        resolve(true);
+                    };
+                });
+            }
+            fallbackRemoveLocal(storeName, id);
+            return true;
+        }
+
+        function fallbackGetLocal(storeName) {
+            try {
+                const data = localStorage.getItem(`educalendar_db_${storeName}`);
+                return data ? JSON.parse(data) : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function fallbackSetLocal(storeName, item) {
+            try {
+                const items = fallbackGetLocal(storeName);
+                const idx = items.findIndex(i => (i.id || i.username) === (item.id || item.username));
+                if (idx >= 0) items[idx] = item;
+                else items.push(item);
+                localStorage.setItem(`educalendar_db_${storeName}`, JSON.stringify(items));
+            } catch (e) {}
+        }
+
+        function fallbackRemoveLocal(storeName, id) {
+            try {
+                let items = fallbackGetLocal(storeName);
+                items = items.filter(i => (i.id || i.username) !== id);
+                localStorage.setItem(`educalendar_db_${storeName}`, JSON.stringify(items));
+            } catch (e) {}
+        }
+
+        // ==========================================
+        // WEB AUDIO CHIME SOUND ENGINE
+        // ==========================================
+        function playChimeSound() {
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return;
+                const ctx = new AudioCtx();
+                
+                const now = ctx.currentTime;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, now); // C5
+                osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.15); // E5
+                osc.frequency.exponentialRampToValueAtTime(783.99, now + 0.3); // G5
+
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.6);
+            } catch (e) {}
+        }
+
+        // ==========================================
+        // STATE MANAGEMENT
+        // ==========================================
+        let currentUserSession = null;
+
+        let state = {
+            currentDate: new Date(),
+            selectedCalendarDay: null,
+            activeTab: 'calendar',
+            tasks: [],
+            scheduleClasses: [],
+            subjects: [
+                { id: 'math', name: 'Matemáticas', color: '#3b82f6' },
+                { id: 'hist', name: 'Historia', color: '#f59e0b' },
+                { id: 'sci', name: 'Ciencias / Física', color: '#10b981' },
+                { id: 'lang', name: 'Lengua y Literatura', color: '#ec4899' },
+                { id: 'eng', name: 'Inglés', color: '#8b5cf6' }
+            ],
+            selectedSubjectFilter: 'ALL',
+            selectedStatusFilter: 'ALL',
+            isRegisterMode: false,
+            groups: [],
+            selectedGroupId: null,
+            groupTasks: []
+        };
+
+        // UI Toast Notifications
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            
+            const colorClass = type === 'success' ? 'bg-emerald-600 border-emerald-400' : 
+                               type === 'error' ? 'bg-rose-600 border-rose-400' : 
+                               'bg-indigo-600 border-indigo-400';
+
+            toast.className = `glass-panel ${colorClass} text-white px-4 py-3 rounded-2xl shadow-xl border text-xs flex items-center gap-2 transform transition-all duration-300 translate-y-4 opacity-0 pointer-events-auto`;
+            toast.innerHTML = `<i class="fa-solid fa-circle-info text-sm"></i><span>${message}</span>`;
+            
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.remove('translate-y-4', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-4');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Auth Handlers
+        window.toggleAuthMode = function() {
+            state.isRegisterMode = !state.isRegisterMode;
+            const title = document.getElementById('authTitle');
+            const subtitle = document.getElementById('authSubtitle');
+            const submitBtn = document.getElementById('authSubmitBtn');
+            const nameContainer = document.getElementById('displayNameContainer');
+            const toggleText = document.getElementById('authToggleText');
+
+            if (state.isRegisterMode) {
+                title.textContent = "Crear Cuenta Nueva";
+                subtitle.textContent = "Regístrate para guardar tus tareas en tu Base de Datos Local";
+                submitBtn.innerHTML = `<span>Crear Cuenta Local</span><i class="fa-solid fa-user-plus text-xs"></i>`;
+                nameContainer.classList.remove('hidden');
+                toggleText.innerHTML = `¿Ya tienes cuenta registrada? <button onclick="toggleAuthMode()" class="text-indigo-400 font-semibold hover:underline ml-1">Inicia Sesión</button>`;
+            } else {
+                title.textContent = "Acceso a EduCalendar";
+                subtitle.textContent = "Inicia sesión local o crea una cuenta en tu navegador";
+                submitBtn.innerHTML = `<span>Iniciar Sesión</span><i class="fa-solid fa-arrow-right text-xs"></i>`;
+                nameContainer.classList.add('hidden');
+                toggleText.innerHTML = `¿Aún no tienes cuenta registrada en el dispositivo? <button onclick="toggleAuthMode()" class="text-indigo-400 font-semibold hover:underline ml-1">Crear cuenta en la Base de Datos</button>`;
+            }
+            document.getElementById('authError').classList.add('hidden');
+        };
+
+        window.handleAuthSubmit = async function(e) {
+            e.preventDefault();
+            const username = document.getElementById('authUsernameInput').value.trim().toLowerCase();
+            const password = document.getElementById('authPasswordInput').value;
+            const displayName = document.getElementById('authDisplayNameInput').value.trim();
+            const errorBox = document.getElementById('authError');
+            const errorMsg = document.getElementById('authErrorMsg');
+
+            errorBox.classList.add('hidden');
+            if (!username || !password) return;
+
+            const allUsers = await dbGetAll('users');
+
+            if (state.isRegisterMode) {
+                if (!displayName) {
+                    errorMsg.textContent = "Por favor ingresa tu nombre de estudiante";
+                    errorBox.classList.remove('hidden');
+                    return;
+                }
+
+                const exists = allUsers.some(u => u.username === username);
+                if (exists) {
+                    errorMsg.textContent = "El nombre de usuario ya existe en esta Base de Datos";
+                    errorBox.classList.remove('hidden');
+                    return;
+                }
+
+                const newUser = {
+                    username: username,
+                    password: password,
+                    displayName: displayName,
+                    createdAt: new Date().toISOString()
+                };
+
+                await dbPut('users', newUser);
+                currentUserSession = { username: newUser.username, displayName: newUser.displayName };
+                localStorage.setItem('educalendar_user_session', JSON.stringify(currentUserSession));
+                showToast("Cuenta creada exitosamente en la DB local", "success");
+                showAppUI();
+                await loadUserData();
+            } else {
+                const user = allUsers.find(u => u.username === username && u.password === password);
+                if (!user) {
+                    errorMsg.textContent = "Usuario o contraseña incorrectos";
+                    errorBox.classList.remove('hidden');
+                    return;
+                }
+
+                currentUserSession = { username: user.username, displayName: user.displayName };
+                localStorage.setItem('educalendar_user_session', JSON.stringify(currentUserSession));
+                showToast(`¡Bienvenido de nuevo, ${user.displayName}!`, "success");
+                showAppUI();
+                await loadUserData();
+            }
+        };
+
+        window.logoutUser = function() {
+            localStorage.removeItem('educalendar_user_session');
+            currentUserSession = null;
+            document.getElementById('appContent').classList.add('hidden');
+            document.getElementById('mainHeader').classList.add('hidden');
+            document.getElementById('authScreen').classList.remove('hidden');
+            showToast("Sesión cerrada correctamente", "info");
+        };
+
+        function showAppUI() {
+            document.getElementById('authScreen').classList.add('hidden');
+            document.getElementById('mainHeader').classList.remove('hidden');
+            document.getElementById('appContent').classList.remove('hidden');
+
+            document.getElementById('userDisplayName').textContent = currentUserSession.displayName;
+            document.getElementById('userAvatar').textContent = currentUserSession.displayName.charAt(0).toUpperCase();
+        }
+
+        async function loadUserData() {
+            if (!currentUserSession) return;
+            const uname = currentUserSession.username;
+
+            // Load user subjects or seed defaults
+            let allSubjects = await dbGetAll('subjects');
+            let userSubjects = allSubjects.filter(s => s.userId === uname);
+            
+            if (userSubjects.length === 0) {
+                for (const defaultSub of state.subjects) {
+                    const newSub = { ...defaultSub, id: defaultSub.id + '_' + Date.now() + Math.random().toString(36).substr(2, 4), userId: uname };
+                    await dbPut('subjects', newSub);
+                }
+                allSubjects = await dbGetAll('subjects');
+                userSubjects = allSubjects.filter(s => s.userId === uname);
+            }
+            state.subjects = userSubjects;
+
+            // Load tasks
+            const allTasks = await dbGetAll('tasks');
+            state.tasks = allTasks.filter(t => t.userId === uname);
+
+            // Load class schedule
+            const allSchedule = await dbGetAll('schedule');
+            state.scheduleClasses = allSchedule.filter(s => s.userId === uname);
+
+            // Load groups
+            const allGroups = await dbGetAll('groups');
+            state.groups = allGroups.filter(g => g.members && g.members.includes(uname));
+
+            // Load group tasks
+            const allGroupTasks = await dbGetAll('groupTasks');
+            state.groupTasks = allGroupTasks;
+
+            updateAllUIViews();
+        }
+
+        function updateAllUIViews() {
+            populateSubjectSelects();
+            renderCalendar();
+            renderSchedule();
+            renderTaskList();
+            renderReminders();
+            renderSubjectsList();
+            renderProgress();
+            renderGroups();
+            renderAnalytics();
+        }
+
+        // Navigation tab swapper
+        window.switchMainTab = function(tab) {
+            state.activeTab = tab;
+            const tabs = ['calendar', 'schedule', 'tasks', 'groups', 'analytics'];
+            
+            tabs.forEach(t => {
+                const section = document.getElementById(`section${t.charAt(0).toUpperCase() + t.slice(1)}`);
+                const btn = document.getElementById(`navTab${t.charAt(0).toUpperCase() + t.slice(1)}`);
+                
+                if (t === tab) {
+                    section.classList.remove('hidden');
+                    btn.className = "px-3 py-1.5 rounded-xl text-indigo-300 bg-slate-800 shadow transition flex items-center gap-1.5 whitespace-nowrap";
+                } else {
+                    section.classList.add('hidden');
+                    btn.className = "px-3 py-1.5 rounded-xl text-slate-400 hover:text-slate-200 transition flex items-center gap-1.5 whitespace-nowrap";
+                }
+            });
+
+            if (tab === 'analytics') {
+                setTimeout(renderAnalytics, 50);
+            }
+        };
+
+        function populateSubjectSelects() {
+            const taskSubSelect = document.getElementById('taskSubjectInput');
+            const filterSubSelect = document.getElementById('subjectFilter');
+            const scheduleSubSelect = document.getElementById('scheduleSubjectInput');
+
+            taskSubSelect.innerHTML = state.subjects.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+            scheduleSubSelect.innerHTML = state.subjects.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+
+            filterSubSelect.innerHTML = `<option value="ALL">Todas las Materias</option>` +
+                state.subjects.map(s => `<option value="${s.id}" ${state.selectedSubjectFilter === s.id ? 'selected' : ''}>${s.name}</option>`).join('');
+        }
+
+        window.applyFilters = function() {
+            state.selectedSubjectFilter = document.getElementById('subjectFilter').value;
+            state.selectedStatusFilter = document.getElementById('statusFilter').value;
+            renderCalendar();
+            renderTaskList();
+        };
+
+        // ==========================================
+        // TASK MANAGEMENT
+        // ==========================================
+        window.openNewTaskModal = function() {
+            document.getElementById('taskForm').reset();
+            document.getElementById('taskIdInput').value = '';
+            document.getElementById('taskModalTitle').innerHTML = `<i class="fa-solid fa-circle-plus text-indigo-400"></i><span>Agregar Nueva Tarea</span>`;
+            document.getElementById('taskDateInput').value = new Date().toISOString().split('T')[0];
+            document.getElementById('taskModal').classList.remove('hidden');
+        };
+
+        window.closeTaskModal = function() {
+            document.getElementById('taskModal').classList.add('hidden');
+        };
+
+        window.handleSaveTask = async function(e) {
+            e.preventDefault();
+            const id = document.getElementById('taskIdInput').value || 'task_' + Date.now();
+            const title = document.getElementById('taskTitleInput').value.trim();
+            const subjectId = document.getElementById('taskSubjectInput').value;
+            const type = document.getElementById('taskTypeInput').value;
+            const date = document.getElementById('taskDateInput').value;
+            const time = document.getElementById('taskTimeInput').value;
+            const priority = document.getElementById('taskPriorityInput').value;
+            const soundAlert = document.getElementById('taskSoundAlertInput').value === 'true';
+            const notes = document.getElementById('taskNotesInput').value.trim();
+
+            const existingTask = state.tasks.find(t => t.id === id);
+
+            const taskObj = {
+                id,
+                userId: currentUserSession.username,
+                title,
+                subjectId,
+                type,
+                date,
+                time,
+                priority,
+                soundAlert,
+                notes,
+                completed: existingTask ? existingTask.completed : false,
+                createdAt: existingTask ? existingTask.createdAt : new Date().toISOString()
+            };
+
+            await dbPut('tasks', taskObj);
+            
+            const idx = state.tasks.findIndex(t => t.id === id);
+            if (idx >= 0) state.tasks[idx] = taskObj;
+            else state.tasks.push(taskObj);
+
+            if (soundAlert) playChimeSound();
+
+            closeTaskModal();
+            showToast("Tarea guardada en la Base de Datos Local", "success");
+            updateAllUIViews();
+        };
+
+        window.toggleTaskComplete = async function(taskId) {
+            const task = state.tasks.find(t => t.id === taskId);
+            if (!task) return;
+
+            task.completed = !task.completed;
+            await dbPut('tasks', task);
+
+            if (task.completed) playChimeSound();
+            showToast(task.completed ? "Tarea marcada como completada" : "Tarea marcada como pendiente", "info");
+            updateAllUIViews();
+        };
+
+        window.deleteTask = async function(taskId) {
+            await dbDelete('tasks', taskId);
+            state.tasks = state.tasks.filter(t => t.id !== taskId);
+            showToast("Tarea eliminada", "info");
+            updateAllUIViews();
+        };
+
+        window.editTask = function(taskId) {
+            const task = state.tasks.find(t => t.id === taskId);
+            if (!task) return;
+
+            document.getElementById('taskIdInput').value = task.id;
+            document.getElementById('taskTitleInput').value = task.title;
+            document.getElementById('taskSubjectInput').value = task.subjectId;
+            document.getElementById('taskTypeInput').value = task.type || 'Tarea';
+            document.getElementById('taskDateInput').value = task.date;
+            document.getElementById('taskTimeInput').value = task.time || '23:59';
+            document.getElementById('taskPriorityInput').value = task.priority || 'Media';
+            document.getElementById('taskSoundAlertInput').value = task.soundAlert ? 'true' : 'false';
+            document.getElementById('taskNotesInput').value = task.notes || '';
+
+            document.getElementById('taskModalTitle').innerHTML = `<i class="fa-solid fa-pen-to-square text-indigo-400"></i><span>Editar Tarea</span>`;
+            document.getElementById('taskModal').classList.remove('hidden');
+        };
+
+        // ==========================================
+        // CLASS SCHEDULE MANAGEMENT
+        // ==========================================
+        window.openClassScheduleModal = function() {
+            document.getElementById('classScheduleModal').classList.remove('hidden');
+        };
+
+        window.closeClassScheduleModal = function() {
+            document.getElementById('classScheduleModal').classList.add('hidden');
+        };
+
+        window.handleSaveScheduleClass = async function(e) {
+            e.preventDefault();
+            const subjectId = document.getElementById('scheduleSubjectInput').value;
+            const dayOfWeek = parseInt(document.getElementById('scheduleDayInput').value);
+            const startTime = document.getElementById('scheduleStartTimeInput').value;
+            const endTime = document.getElementById('scheduleEndTimeInput').value;
+            const room = document.getElementById('scheduleRoomInput').value.trim();
+
+            const newClass = {
+                id: 'sched_' + Date.now(),
+                userId: currentUserSession.username,
+                subjectId,
+                dayOfWeek,
+                startTime,
+                endTime,
+                room
+            };
+
+            await dbPut('schedule', newClass);
+            state.scheduleClasses.push(newClass);
+
+            closeClassScheduleModal();
+            showToast("Clase añadida al horario semanal", "success");
+            renderSchedule();
+        };
+
+        window.deleteScheduleClass = async function(id) {
+            await dbDelete('schedule', id);
+            state.scheduleClasses = state.scheduleClasses.filter(c => c.id !== id);
+            showToast("Clase eliminada del horario", "info");
+            renderSchedule();
+        };
+
+        // ==========================================
+        // SUBJECT MANAGEMENT
+        // ==========================================
+        window.openSubjectModal = function() {
+            document.getElementById('subjectModal').classList.remove('hidden');
+        };
+
+        window.closeSubjectModal = function() {
+            document.getElementById('subjectModal').classList.add('hidden');
+        };
+
+        window.handleSaveSubject = async function(e) {
+            e.preventDefault();
+            const name = document.getElementById('subjectNameInput').value.trim();
+            const color = document.getElementById('subjectColorInput').value;
+
+            const newSub = {
+                id: 'sub_' + Date.now(),
+                userId: currentUserSession.username,
+                name,
+                color
+            };
+
+            await dbPut('subjects', newSub);
+            state.subjects.push(newSub);
+
+            closeSubjectModal();
+            showToast("Nueva materia añadida", "success");
+            updateAllUIViews();
+        };
+
+        window.deleteSubject = async function(subId) {
+            if (state.subjects.length <= 1) {
+                showToast("Debes mantener al menos una materia", "error");
+                return;
+            }
+
+            await dbDelete('subjects', subId);
+            state.subjects = state.subjects.filter(s => s.id !== subId);
+            showToast("Materia eliminada", "info");
+            updateAllUIViews();
+        };
+
+        // ==========================================
+        // STUDY GROUPS MANAGEMENT
+        // ==========================================
+        window.openCreateGroupModal = function() {
+            document.getElementById('createGroupModal').classList.remove('hidden');
+        };
+        window.closeCreateGroupModal = function() {
+            document.getElementById('createGroupModal').classList.add('hidden');
+        };
+
+        window.openJoinGroupModal = function() {
+            document.getElementById('joinGroupModal').classList.remove('hidden');
+        };
+        window.closeJoinGroupModal = function() {
+            document.getElementById('joinGroupModal').classList.add('hidden');
+        };
+
+        window.openGroupTaskModal = function() {
+            if (!state.selectedGroupId) return;
+            document.getElementById('groupTaskDateInput').value = new Date().toISOString().split('T')[0];
+            document.getElementById('groupTaskModal').classList.remove('hidden');
+        };
+        window.closeGroupTaskModal = function() {
+            document.getElementById('groupTaskModal').classList.add('hidden');
+        };
+
+        window.handleCreateGroup = async function(e) {
+            e.preventDefault();
+            const name = document.getElementById('groupNameInput').value.trim();
+            const subject = document.getElementById('groupSubjectInput').value.trim();
+            const desc = document.getElementById('groupDescInput').value.trim();
+
+            const code = 'GR-' + Math.random().toString(36).substring(2, 7).toUpperCase();
+
+            const newGroup = {
+                id: 'group_' + Date.now(),
+                code,
+                name,
+                subject: subject || 'General',
+                description: desc,
+                ownerUserId: currentUserSession.username,
+                members: [currentUserSession.username],
+                createdAt: new Date().toISOString()
+            };
+
+            await dbPut('groups', newGroup);
+            state.groups.push(newGroup);
+            state.selectedGroupId = newGroup.id;
+
+            closeCreateGroupModal();
+            showToast(`¡Grupo creado! Código de acceso: ${code}`, "success");
+            renderGroups();
+        };
+
+        window.handleJoinGroup = async function(e) {
+            e.preventDefault();
+            const code = document.getElementById('joinGroupCodeInput').value.trim().toUpperCase();
+
+            const allGroups = await dbGetAll('groups');
+            const targetGroup = allGroups.find(g => g.code === code);
+
+            if (!targetGroup) {
+                showToast("Código de grupo no encontrado en la DB local", "error");
+                return;
+            }
+
+            if (!targetGroup.members.includes(currentUserSession.username)) {
+                targetGroup.members.push(currentUserSession.username);
+                await dbPut('groups', targetGroup);
+            }
+
+            const existsInState = state.groups.some(g => g.id === targetGroup.id);
+            if (!existsInState) state.groups.push(targetGroup);
+            state.selectedGroupId = targetGroup.id;
+
+            closeJoinGroupModal();
+            showToast(`Te has unido al grupo ${targetGroup.name}`, "success");
+            renderGroups();
+        };
+
+        window.handleSaveGroupTask = async function(e) {
+            e.preventDefault();
+            if (!state.selectedGroupId) return;
+
+            const title = document.getElementById('groupTaskTitleInput').value.trim();
+            const date = document.getElementById('groupTaskDateInput').value;
+            const assignee = document.getElementById('groupTaskAssigneeInput').value;
+            const notes = document.getElementById('groupTaskNotesInput').value.trim();
+
+            const newTask = {
+                id: 'gtask_' + Date.now(),
+                groupId: state.selectedGroupId,
+                title,
+                date,
+                assignee,
+                notes,
+                completed: false,
+                createdBy: currentUserSession.username
+            };
+
+            await dbPut('groupTasks', newTask);
+            state.groupTasks.push(newTask);
+
+            closeGroupTaskModal();
+            showToast("Tarea añadida al grupo", "success");
+            renderGroups();
+        };
+
+        window.toggleGroupTaskComplete = async function(taskId) {
+            const gtask = state.groupTasks.find(gt => gt.id === taskId);
+            if (!gtask) return;
+
+            gtask.completed = !gtask.completed;
+            await dbPut('groupTasks', gtask);
+            renderGroups();
+        };
+
+        // ==========================================
+        // RENDER FUNCTIONS
+        // ==========================================
+        
+        // 1. CALENDAR VIEW RENDERER
+        function renderCalendar() {
+            const grid = document.getElementById('calendarGrid');
+            const monthYearText = document.getElementById('calendarMonthYear');
+            
+            const date = state.currentDate;
+            const year = date.getFullYear();
+            const month = date.getMonth();
+
+            const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+            monthYearText.textContent = `${monthNames[month]} ${year}`;
+
+            grid.innerHTML = '';
+
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            // Previous month padding
+            for (let i = 0; i < firstDay; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'min-h-[80px] p-1 rounded-xl bg-slate-900/30 border border-slate-900 opacity-20';
+                grid.appendChild(emptyCell);
+            }
+
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                
+                // Filter tasks for this day
+                const dayTasks = state.tasks.filter(t => {
+                    const matchDate = t.date === dayDateStr;
+                    const matchSubject = state.selectedSubjectFilter === 'ALL' || t.subjectId === state.selectedSubjectFilter;
+                    const matchStatus = state.selectedStatusFilter === 'ALL' || 
+                        (state.selectedStatusFilter === 'PENDING' && !t.completed) ||
+                        (state.selectedStatusFilter === 'COMPLETED' && t.completed);
+                    return matchDate && matchSubject && matchStatus;
+                });
+
+                const isToday = dayDateStr === todayStr;
+
+                const dayCell = document.createElement('div');
+                dayCell.className = `min-h-[85px] sm:min-h-[95px] p-1.5 rounded-xl border transition cursor-pointer flex flex-col justify-between ${
+                    isToday ? 'bg-indigo-950/40 border-indigo-500/60 shadow-lg shadow-indigo-500/10' : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                }`;
+
+                dayCell.onclick = () => openDayDetailModal(dayDateStr, dayTasks);
+
+                let tasksMarkup = '';
+                dayTasks.slice(0, 3).forEach(t => {
+                    const sub = state.subjects.find(s => s.id === t.subjectId) || { color: '#6366f1', name: 'Materia' };
+                    tasksMarkup += `
+                        <div class="text-[10px] px-1.5 py-0.5 rounded-md truncate text-white font-medium flex items-center justify-between ${t.completed ? 'opacity-40 line-through' : ''}" style="background-color: ${sub.color}33; border-left: 2px solid ${sub.color};">
+                            <span class="truncate">${t.title}</span>
+                        </div>
+                    `;
+                });
+
+                if (dayTasks.length > 3) {
+                    tasksMarkup += `<div class="text-[9px] text-slate-400 font-semibold px-1">+${dayTasks.length - 3} más</div>`;
+                }
+
+                dayCell.innerHTML = `
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs font-bold ${isToday ? 'w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[11px]' : 'text-slate-300'}">${day}</span>
+                        ${dayTasks.length > 0 ? `<span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>` : ''}
+                    </div>
+                    <div class="space-y-1 overflow-hidden">
+                        ${tasksMarkup}
+                    </div>
+                `;
+
+                grid.appendChild(dayCell);
+            }
+        }
+
+        window.changeMonth = function(delta) {
+            state.currentDate.setMonth(state.currentDate.getMonth() + delta);
+            renderCalendar();
+        };
+
+        window.goToToday = function() {
+            state.currentDate = new Date();
+            renderCalendar();
+        };
+
+        function openDayDetailModal(dateStr, dayTasks) {
+            state.selectedCalendarDay = dateStr;
+            document.getElementById('dayModalDateTitle').textContent = `Entregas (${dateStr})`;
+            const container = document.getElementById('dayModalTaskList');
+
+            if (dayTasks.length === 0) {
+                container.innerHTML = `<p class="text-xs text-slate-500 text-center py-6">No hay tareas programadas para este día.</p>`;
+            } else {
+                container.innerHTML = dayTasks.map(t => {
+                    const sub = state.subjects.find(s => s.id === t.subjectId) || { color: '#6366f1', name: 'Materia' };
+                    return `
+                        <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+                            <div class="flex items-center gap-2.5">
+                                <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${sub.color};"></span>
+                                <div>
+                                    <div class="text-xs font-semibold text-white ${t.completed ? 'line-through text-slate-400' : ''}">${t.title}</div>
+                                    <div class="text-[10px] text-slate-400">${sub.name} • ${t.time || '23:59'}</div>
+                                </div>
+                            </div>
+                            <button onclick="toggleTaskComplete('${t.id}'); closeDayDetailModal();" class="px-2.5 py-1 rounded-lg bg-slate-800 text-[10px] text-indigo-300 font-semibold hover:bg-indigo-600 hover:text-white transition">
+                                ${t.completed ? 'Pendiente' : 'Completar'}
+                            </button>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            document.getElementById('dayDetailModal').classList.remove('hidden');
+        }
+
+        window.closeDayDetailModal = function() {
+            document.getElementById('dayDetailModal').classList.add('hidden');
+        };
+
+        window.openNewTaskForSelectedDay = function() {
+            closeDayDetailModal();
+            openNewTaskModal();
+            if (state.selectedCalendarDay) {
+                document.getElementById('taskDateInput').value = state.selectedCalendarDay;
+            }
+        };
+
+        // 2. SCHEDULE RENDERER
+        function renderSchedule() {
+            const body = document.getElementById('scheduleGridBody');
+            body.innerHTML = '';
+
+            const hours = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
+
+            hours.forEach(hour => {
+                const row = document.createElement('div');
+                row.className = 'schedule-grid items-center gap-1 min-h-[50px] border-b border-slate-900/60 text-xs';
+
+                let hourMarkup = `<div class="text-slate-500 font-mono text-[11px] text-center">${hour}</div>`;
+
+                for (let day = 1; day <= 5; day++) {
+                    const classes = state.scheduleClasses.filter(c => {
+                        const classHour = c.startTime.substring(0, 2);
+                        const rowHour = hour.substring(0, 2);
+                        return c.dayOfWeek === day && classHour === rowHour;
+                    });
+
+                    if (classes.length > 0) {
+                        let classCards = classes.map(c => {
+                            const sub = state.subjects.find(s => s.id === c.subjectId) || { color: '#6366f1', name: 'Materia' };
+                            return `
+                                <div class="p-1.5 rounded-xl text-[10px] text-white font-semibold relative group shadow-sm" style="background-color: ${sub.color}25; border-left: 3px solid ${sub.color};">
+                                    <div class="truncate">${sub.name}</div>
+                                    <div class="text-[9px] text-slate-400 font-normal">${c.startTime} - ${c.endTime}</div>
+                                    ${c.room ? `<div class="text-[9px] text-indigo-300 truncate">${c.room}</div>` : ''}
+                                    <button onclick="deleteScheduleClass('${c.id}')" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-rose-400 hover:text-rose-300 p-0.5">
+                                        <i class="fa-solid fa-xmark text-[9px]"></i>
+                                    </button>
+                                </div>
+                            `;
+                        }).join('');
+
+                        hourMarkup += `<div class="h-full p-0.5 space-y-1">${classCards}</div>`;
+                    } else {
+                        hourMarkup += `<div class="h-full rounded-lg bg-slate-900/20 hover:bg-slate-900/40 transition"></div>`;
+                    }
+                }
+
+                row.innerHTML = hourMarkup;
+                body.appendChild(row);
+            });
+        }
+
+        // 3. TASK LIST RENDERER
+        function renderTaskList() {
+            const container = document.getElementById('taskList');
+            let filtered = state.tasks;
+
+            if (state.selectedSubjectFilter !== 'ALL') {
+                filtered = filtered.filter(t => t.subjectId === state.selectedSubjectFilter);
+            }
+
+            if (state.selectedStatusFilter === 'PENDING') {
+                filtered = filtered.filter(t => !t.completed);
+            } else if (state.selectedStatusFilter === 'COMPLETED') {
+                filtered = filtered.filter(t => t.completed);
+            }
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="glass-panel p-8 rounded-2xl text-center text-slate-500">
+                        <i class="fa-solid fa-check-double text-3xl mb-2 text-slate-600"></i>
+                        <p class="text-xs">No hay tareas o exámenes registrados con estos filtros.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = filtered.map(t => {
+                const sub = state.subjects.find(s => s.id === t.subjectId) || { color: '#6366f1', name: 'Materia' };
+                const priorityClass = t.priority === 'Alta' ? 'text-rose-400 bg-rose-500/10 border-rose-500/20' : 
+                                      t.priority === 'Media' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 
+                                      'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+
+                return `
+                    <div class="glass-panel p-3.5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-l-4" style="border-left-color: ${sub.color};">
+                        <div class="flex items-start gap-3">
+                            <button onclick="toggleTaskComplete('${t.id}')" class="mt-0.5 w-5 h-5 rounded-lg border flex items-center justify-center transition ${t.completed ? 'bg-emerald-500 border-emerald-400 text-white' : 'border-slate-700 hover:border-indigo-500 text-transparent'}">
+                                <i class="fa-solid fa-check text-[10px]"></i>
+                            </button>
+                            <div>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <h4 class="text-xs font-bold text-white ${t.completed ? 'line-through text-slate-400' : ''}">${t.title}</h4>
+                                    <span class="text-[9px] font-semibold px-2 py-0.5 rounded-full border ${priorityClass}">${t.priority || 'Media'}</span>
+                                    <span class="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">${t.type || 'Tarea'}</span>
+                                </div>
+                                <p class="text-[11px] text-slate-400 mt-1">${sub.name} • Fecha: <span class="text-slate-200 font-medium">${t.date} (${t.time || '23:59'})</span></p>
+                                ${t.notes ? `<p class="text-[10px] text-slate-400 italic mt-0.5 bg-slate-900/50 p-1.5 rounded-lg border border-slate-800/80">${t.notes}</p>` : ''}
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2 self-end sm:self-center">
+                            <button onclick="editTask('${t.id}')" title="Editar" class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white text-xs transition">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
+                            <button onclick="deleteTask('${t.id}')" title="Eliminar" class="p-2 rounded-xl bg-slate-900 hover:bg-rose-950/50 text-slate-400 hover:text-rose-400 text-xs transition">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 4. SIDEBAR REMINDERS RENDERER
+        function renderReminders() {
+            const list = document.getElementById('todayRemindersList');
+            const badge = document.getElementById('todayBadgeCount');
+
+            const todayStr = new Date().toISOString().split('T')[0];
+            const upcomingTasks = state.tasks
+                .filter(t => !t.completed)
+                .sort((a, b) => new Date(a.date) - new Date(b.date))
+                .slice(0, 5);
+
+            badge.textContent = upcomingTasks.length;
+
+            if (upcomingTasks.length === 0) {
+                list.innerHTML = `<p class="text-xs text-slate-500 text-center py-4">Sin entregas pendientes próximas.</p>`;
+                return;
+            }
+
+            list.innerHTML = upcomingTasks.map(t => {
+                const sub = state.subjects.find(s => s.id === t.subjectId) || { color: '#6366f1', name: 'Materia' };
+                const isToday = t.date === todayStr;
+
+                return `
+                    <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: ${sub.color};"></span>
+                            <div class="min-w-0">
+                                <div class="text-xs font-semibold text-slate-200 truncate">${t.title}</div>
+                                <div class="text-[10px] text-slate-400">${t.date} ${isToday ? '<span class="text-indigo-400 font-bold">(¡Hoy!)</span>' : ''}</div>
+                            </div>
+                        </div>
+                        <button onclick="toggleTaskComplete('${t.id}')" title="Completar" class="p-1.5 rounded-lg text-slate-400 hover:text-emerald-400 transition text-xs flex-shrink-0">
+                            <i class="fa-regular fa-circle-check"></i>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 5. SUBJECTS LIST RENDERER
+        function renderSubjectsList() {
+            const list = document.getElementById('subjectsList');
+            list.innerHTML = state.subjects.map(s => `
+                <div class="p-2 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-md" style="background-color: ${s.color};"></span>
+                        <span class="text-xs font-semibold text-slate-200">${s.name}</span>
+                    </div>
+                    <button onclick="deleteSubject('${s.id}')" title="Eliminar materia" class="text-slate-500 hover:text-rose-400 text-xs px-1">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        // 6. PROGRESS SUMMARY RENDERER
+        function renderProgress() {
+            const total = state.tasks.length;
+            const completed = state.tasks.filter(t => t.completed).length;
+            const pending = total - completed;
+
+            const percentage = total === 0 ? 0 : Math.round((completed / total) * 100);
+
+            document.getElementById('completionPercentage').textContent = `${percentage}%`;
+            document.getElementById('progressBar').style.width = `${percentage}%`;
+            document.getElementById('pendingTasksCount').textContent = pending;
+            document.getElementById('completedTasksCount').textContent = completed;
+        }
+
+        // 7. GROUPS VIEW RENDERER
+        function renderGroups() {
+            const list = document.getElementById('myGroupsList');
+            const badge = document.getElementById('groupCountBadge');
+            const detailsPanel = document.getElementById('groupDetailsPanel');
+
+            badge.textContent = state.groups.length;
+
+            if (state.groups.length === 0) {
+                list.innerHTML = `<p class="text-xs text-slate-500 text-center py-4">No estás en ningún grupo de estudio aún.</p>`;
+                detailsPanel.innerHTML = `
+                    <div class="text-center py-12 text-slate-500 space-y-2">
+                        <i class="fa-solid fa-people-group text-4xl text-slate-600"></i>
+                        <p class="text-xs">Crea un grupo de trabajo o únete con un código de 7 caracteres.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            list.innerHTML = state.groups.map(g => `
+                <div onclick="selectGroup('${g.id}')" class="p-3 rounded-xl border transition cursor-pointer ${
+                    state.selectedGroupId === g.id ? 'bg-indigo-950/50 border-indigo-500' : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
+                }">
+                    <div class="flex items-center justify-between mb-1">
+                        <h5 class="text-xs font-bold text-white truncate">${g.name}</h5>
+                        <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700">${g.code}</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400 truncate">${g.subject} • ${g.members ? g.members.length : 1} miembros</p>
+                </div>
+            `).join('');
+
+            const selectedGroup = state.groups.find(g => g.id === state.selectedGroupId);
+            if (!selectedGroup) return;
+
+            const gTasks = state.groupTasks.filter(gt => gt.groupId === selectedGroup.id);
+
+            detailsPanel.innerHTML = `
+                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                    <div>
+                        <h4 class="text-base font-bold text-white flex items-center gap-2">
+                            <span>${selectedGroup.name}</span>
+                            <span class="text-[10px] font-mono bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-500/30">Código: ${selectedGroup.code}</span>
+                        </h4>
+                        <p class="text-xs text-slate-400">${selectedGroup.subject} — ${selectedGroup.description || 'Sin descripción'}</p>
+                    </div>
+                    <button onclick="openGroupTaskModal()" class="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-plus text-xs"></i>
+                        <span>Tarea de Grupo</span>
+                    </button>
+                </div>
+
+                <div class="space-y-3">
+                    <h5 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Tareas del Grupo</h5>
+                    ${gTasks.length === 0 ? `<p class="text-xs text-slate-500 py-4 text-center">No hay tareas grupales asignadas.</p>` : `
+                        <div class="space-y-2">
+                            ${gTasks.map(gt => `
+                                <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <button onclick="toggleGroupTaskComplete('${gt.id}')" class="w-5 h-5 rounded-lg border flex items-center justify-center transition ${gt.completed ? 'bg-emerald-500 border-emerald-400 text-white' : 'border-slate-700 hover:border-indigo-500 text-transparent'}">
+                                            <i class="fa-solid fa-check text-[10px]"></i>
+                                        </button>
+                                        <div>
+                                            <div class="text-xs font-semibold text-white ${gt.completed ? 'line-through text-slate-400' : ''}">${gt.title}</div>
+                                            <div class="text-[10px] text-slate-400">Entrega: ${gt.date} • Asignado a: <span class="text-indigo-300 font-medium">${gt.assignee}</span></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `}
+                </div>
+            `;
+        }
+
+        window.selectGroup = function(groupId) {
+            state.selectedGroupId = groupId;
+            renderGroups();
+        };
+
+        // 8. CANVAS ANALYTICS RENDERER
+        function renderAnalytics() {
+            renderDonutChart();
+            renderBarChart();
+        }
+
+        function renderDonutChart() {
+            const canvas = document.getElementById('canvasDonutChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const total = state.tasks.length;
+            const completed = state.tasks.filter(t => t.completed).length;
+            const pending = total - completed;
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = 65;
+            const innerRadius = 42;
+
+            if (total === 0) {
+                // Empty circle
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+                ctx.fillStyle = '#1e293b';
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, innerRadius, 0, 2 * Math.PI);
+                ctx.fillStyle = '#0f172a';
+                ctx.fill();
+                return;
+            }
+
+            const completedAngle = (completed / total) * 2 * Math.PI;
+            const pendingAngle = (pending / total) * 2 * Math.PI;
+
+            // Draw Completed Slice
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, radius, 0, completedAngle);
+            ctx.fillStyle = '#10b981';
+            ctx.fill();
+
+            // Draw Pending Slice
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, radius, completedAngle, completedAngle + pendingAngle);
+            ctx.fillStyle = '#6366f1';
+            ctx.fill();
+
+            // Inner cutout
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, innerRadius, 0, 2 * Math.PI);
+            ctx.fillStyle = '#0f172a';
+            ctx.fill();
+
+            // Center Text
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#f8fafc';
+            ctx.font = 'bold 16px Plus Jakarta Sans';
+            ctx.fillText(`${total}`, centerX, centerY - 8);
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '10px Plus Jakarta Sans';
+            ctx.fillText('Tareas', centerX, centerY + 10);
+        }
+
+        function renderBarChart() {
+            const canvas = document.getElementById('canvasBarChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const subjects = state.subjects;
+            if (subjects.length === 0) return;
+
+            const counts = subjects.map(s => {
+                return state.tasks.filter(t => t.subjectId === s.id && !t.completed).length;
+            });
+
+            const maxCount = Math.max(...counts, 3);
+            const padding = 30;
+            const chartWidth = canvas.width - (padding * 2);
+            const chartHeight = canvas.height - (padding * 2);
+            const barWidth = Math.min(30, (chartWidth / subjects.length) - 10);
+
+            subjects.forEach((sub, i) => {
+                const count = counts[i];
+                const barHeight = (count / maxCount) * chartHeight;
+                const x = padding + (i * (chartWidth / subjects.length)) + 5;
+                const y = canvas.height - padding - barHeight;
+
+                // Bar
+                ctx.fillStyle = sub.color;
+                ctx.beginPath();
+                ctx.roundRect ? ctx.roundRect(x, y, barWidth, barHeight, [4, 4, 0, 0]) : ctx.rect(x, y, barWidth, barHeight);
+                ctx.fill();
+
+                // Value
+                ctx.fillStyle = '#f8fafc';
+                ctx.font = 'bold 10px Plus Jakarta Sans';
+                ctx.textAlign = 'center';
+                ctx.fillText(`${count}`, x + (barWidth / 2), y - 5);
+
+                // Label
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '9px Plus Jakarta Sans';
+                ctx.fillText(sub.name.substring(0, 6) + '.', x + (barWidth / 2), canvas.height - 10);
+            });
+        }
+
+        // ==========================================
+        // DATABASE BACKUP TOOLS
+        // ==========================================
+        window.openBackupModal = function() {
+            document.getElementById('backupModal').classList.remove('hidden');
+        };
+
+        window.closeBackupModal = function() {
+            document.getElementById('backupModal').classList.add('hidden');
+        };
+
+        window.exportDatabaseJSON = async function() {
+            const data = {
+                users: await dbGetAll('users'),
+                tasks: await dbGetAll('tasks'),
+                subjects: await dbGetAll('subjects'),
+                schedule: await dbGetAll('schedule'),
+                groups: await dbGetAll('groups'),
+                groupTasks: await dbGetAll('groupTasks'),
+                exportDate: new Date().toISOString()
+            };
+
+            const jsonStr = JSON.stringify(data, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `EduCalendar_Backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast("Copia de seguridad descargada", "success");
+        };
+
+        window.importDatabaseJSON = function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (evt) => {
+                try {
+                    const data = JSON.parse(evt.target.result);
+                    if (data.tasks) for (const t of data.tasks) await dbPut('tasks', t);
+                    if (data.subjects) for (const s of data.subjects) await dbPut('subjects', s);
+                    if (data.schedule) for (const sc of data.schedule) await dbPut('schedule', sc);
+                    if (data.groups) for (const g of data.groups) await dbPut('groups', g);
+                    if (data.groupTasks) for (const gt of data.groupTasks) await dbPut('groupTasks', gt);
+
+                    showToast("Datos importados correctamente", "success");
+                    closeBackupModal();
+                    await loadUserData();
+                } catch (err) {
+                    showToast("Error al importar el archivo JSON", "error");
+                }
+            };
+            reader.readAsText(file);
+        };
+
+        // ==========================================
+        // INITIALIZATION
+        // ==========================================
+        window.addEventListener('load', async () => {
+            await initLocalDatabase();
+
+            const savedSession = localStorage.getItem('educalendar_user_session');
+            if (savedSession) {
+                try {
+                    currentUserSession = JSON.parse(savedSession);
+                    showAppUI();
+                    await loadUserData();
+                } catch (e) {
+                    localStorage.removeItem('educalendar_user_session');
+                }
+            }
+        });
+    </script>
+</body>
+</html>
